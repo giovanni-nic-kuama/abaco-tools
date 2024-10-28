@@ -12,7 +12,11 @@ class BundleDeployer : Runnable {
     private val engineProjectPath = "C:\\Users\\Noitu\\Devel\\abaco\\fvg-payment-prints"
     private val engineProjectName = "liquidation-list"
     private val bundlesProjectPath = "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles"
-    private val bundlePath = ""
+    private val bundlePath = "config"
+    private val tenant = "master"
+    private val engineName = "print-engine"
+    private val bundleName = "appspay-proc"
+    private val bundleSubFolder = "print-flow"
 
     override fun run() {
         // 1) Exposes Java and Maven Version
@@ -138,8 +142,8 @@ class BundleDeployer : Runnable {
         }
 
         println("=== Jar built ===\n")
-
-        // TODO: modules name from pom
+//
+//        // TODO: modules name from pom
         val moduleTargetFolderFileList = Paths.get("$engineProjectPath/$engineProjectName", "target")
             .toFile()
             .listFiles()?.toList() ?: emptyList()
@@ -154,13 +158,62 @@ class BundleDeployer : Runnable {
             return
         }
 
-        val pomFileName = jarFiles[0]
+        val jarFile = jarFiles[0]
 
-        println("=== Jar $pomFileName is ready! ===\n")
+        println("=== Jar $jarFile is ready! ===\n")
 
-        val branchName = "test/quarkus-test"
-        val commitMessage = "this is a test"
-        val shouldPush = false
+        val bundleFolder = Paths.get(bundlesProjectPath, bundlePath, tenant, engineName).toFile()
+
+        if (!bundleFolder.exists()) {
+            println("Error. Target Folder Bundle not found at $bundleFolder")
+        }
+
+        var previousBundles = bundleFolder.listFiles()
+            ?.filter { it.isDirectory }
+            ?.filter { it.name.contains(bundleName) }
+            ?: listOf()
+
+        if (previousBundles.isEmpty()) {
+            println("Error. Bundle with name $bundleName does not exist")
+            return
+        }
+
+        previousBundles = previousBundles.sortedByDescending { it.name }
+
+        val latestBundle = previousBundles[0]
+
+        val splitBundleName = latestBundle.name.split("-")
+
+        if (splitBundleName.size != 3) {
+            println("Error. Cannot extract bundle version from file")
+            return
+        }
+
+        val latestBundleVersion = splitBundleName[2]
+
+        val latestBundleVersionInt = latestBundleVersion.toIntOrNull()
+
+        if (latestBundleVersionInt == null) {
+            println("Cannot convert latest bundle version to a Number")
+            return
+        }
+
+        val paddedBundleVersion = (latestBundleVersionInt + 1).toString().padStart(4, '0')
+        val newBundleName = "$bundleName-$paddedBundleVersion"
+
+        val newBundleFolders = Paths.get(bundleFolder.path, newBundleName, bundleSubFolder).toFile()
+
+        if (!newBundleFolders.mkdirs()) {
+            println("Cannot create folders")
+            return
+        }
+
+        val targetJarFile = File(newBundleFolders, jarFile.name)
+
+        jarFile.copyTo(targetJarFile, true)
+
+        val branchName = "test/bundle-deployer"
+        val commitMessage = "this is a test of deploying ${jarFile.name}"
 
         runtime.exec("git fetch --all --prune --prune-tags".toPowerShellCommand(), null, File(bundlesProjectPath))
             .waitFor()
@@ -174,13 +227,11 @@ class BundleDeployer : Runnable {
         runtime.exec("git switch -c $branchName".toPowerShellCommand(), null, File(bundlesProjectPath))
             .waitFor()
 
-        runtime.exec("git commit -m \"$commitMessage\"".toPowerShellCommand(), null, File(bundlesProjectPath))
+        runtime.exec("git add .", null, File(bundlesProjectPath))
             .waitFor()
 
-//        if (shouldPush) {
-//            runtime.exec("git push origin $branchName".toPowerShellCommand(), null, File(bundlesProjectPath))
-//                .waitFor()
-//        }
+        runtime.exec(listOf("powershell.exe", "git", "commit", "-m", "'$commitMessage'").toTypedArray(), null, File(bundlesProjectPath))
 
+        val shouldPush = false
     }
 }
