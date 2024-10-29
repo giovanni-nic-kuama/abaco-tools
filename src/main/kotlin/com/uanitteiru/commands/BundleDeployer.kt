@@ -1,16 +1,24 @@
 package com.uanitteiru.commands
 
+import com.uanitteiru.services.BundleService
+import com.uanitteiru.services.GitService
+import com.uanitteiru.services.JarFileServices
+import com.uanitteiru.services.JavaAndMavenService
+import com.uanitteiru.services.MavenCommandsService
+import com.uanitteiru.services.PomFileService
+import com.uanitteiru.services.QuestionService
+import com.uanitteiru.utils.PrettyLogger
 import com.uanitteiru.utils.toPowerShellCommand
 import picocli.CommandLine.Command
-import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
 import java.nio.file.Paths
 
 @Command(name = "bundle-deployer", mixinStandardHelpOptions = true)
 class BundleDeployer : Runnable {
+    private val prettyLogger = PrettyLogger()
+    private val pomFileName = "pom.xml"
     private val engineProjectPath = "C:\\Users\\Noitu\\Devel\\abaco\\fvg-payment-prints"
-    private val engineProjectName = "liquidation-list"
+    private val engineJavaModulesNames = listOf("liquidation-list", "payment-file")
     private val bundlesProjectPath = "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles"
     private val bundlePath = "config"
     private val tenant = "master"
@@ -19,219 +27,122 @@ class BundleDeployer : Runnable {
     private val bundleSubFolder = "print-flow"
 
     override fun run() {
+        val questionService = QuestionService(prettyLogger)
+        val mavenCommandsService = MavenCommandsService(prettyLogger)
+
         // 1) Exposes Java and Maven Version
-        println("\n=== Abaco CLI Deployer Tools ===\n")
+        prettyLogger.printInfoMessage("Abaco CLI Deployer Tools")
 
-        val javaVersionOutput = Runtime.getRuntime().exec("java --version".toPowerShellCommand())
-            .inputStream.bufferedReader().readText()
-
-        val mavenVersionOutput = Runtime.getRuntime().exec("mvn --version".toPowerShellCommand())
-            .inputStream.bufferedReader().readText()
-
-        println("=== Java version for current session ===\n")
-        println(javaVersionOutput)
-
-        println("=== Maven version for current session ===\n")
-        println(mavenVersionOutput)
-
+        JavaAndMavenService(prettyLogger).evaluateMavenAndJavaVersions()
 
         // 2) Ask user if maven and java are correct.
-        println("> Do you want to continue? [y/n]")
-        var confirmOrDismissJavaAndMavenVersion: String? = readlnOrNull()
+        val javaVersionIsCorrect = questionService
+            .askPositiveOrNegativeQuestionQuestion("Do you want to continue? [y/n]")
 
-        while (confirmOrDismissJavaAndMavenVersion != "y" && confirmOrDismissJavaAndMavenVersion != "n") {
-            confirmOrDismissJavaAndMavenVersion = readlnOrNull()
-        }
-
-        if (confirmOrDismissJavaAndMavenVersion == "n") {
+        if (!javaVersionIsCorrect) {
+            prettyLogger.printWarnMessage("Exiting the application. Bye!")
             return
         }
 
-        println("\n=== Loaded Projects: ===\n")
+        prettyLogger.printInfoMessage("")
+        prettyLogger.printInfoMessage("Loaded Projects:")
+        prettyLogger.printInfoMessage("")
 
-        println("Engine:    $engineProjectPath")
-        println("Bundles:   $bundlesProjectPath")
+        prettyLogger.printInfoMessage("Engine project:    $engineProjectPath")
+        prettyLogger.printInfoMessage("Bundle project:    $bundlesProjectPath")
+        prettyLogger.printInfoMessage("")
 
-        println("\n > Are loaded projects correct? [y/n]")
+        val projectsAreCorrect = questionService
+            .askPositiveOrNegativeQuestionQuestion("Are loaded projects correct? [y/n]")
 
-        var confirmOrDismissProjectPaths: String? = readlnOrNull()
-
-        while (confirmOrDismissProjectPaths != "y" && confirmOrDismissProjectPaths != "n") {
-            confirmOrDismissProjectPaths = readlnOrNull()
-        }
-
-        if (confirmOrDismissProjectPaths == "n") {
+        if (!projectsAreCorrect) {
+            printExitMessage()
             return
         }
 
-        println("\n=== Scanning engine pom file... ===")
+        prettyLogger.printInfoMessage("")
+        prettyLogger.printInfoMessage("Searching engine project pom file...")
+        prettyLogger.printInfoMessage("")
 
-        val enginePomFile = Paths.get(engineProjectPath, "pom.xml").toFile()
+        val enginePomFile = Paths.get(engineProjectPath, pomFileName).toFile()
 
         if (!enginePomFile.exists()) {
-            println("Error: pom file not found for engine project at $engineProjectPath")
+            prettyLogger.printErrorAndExitMessages("pom file not found for engine project at $engineProjectPath")
             return
         }
 
-        println("\n=== pom file found ===\n")
-        println("=== Scanning project version... ===\n")
-        var version : String? = null
+        prettyLogger.printInfoMessage("Found main pom file")
+        prettyLogger.printInfoMessage("")
+        prettyLogger.printInfoMessage("Retrieving engine current version...")
+        prettyLogger.printInfoMessage("")
 
-        val pomFileLines = enginePomFile.readLines()
+        val currentEngineProjectVersion = PomFileService(prettyLogger).scanPomFileForVersion(enginePomFile)
 
-        for (pomFileLine in pomFileLines) {
-            if (pomFileLine.trimStart().startsWith("<version>")) {
-                version = pomFileLine.substringAfter("<version>").substringBefore("</version>")
-                break
-            }
-        }
-
-        if (version == null) {
-            println("=== No project version found ===")
+        if (currentEngineProjectVersion == null) {
+            prettyLogger.printErrorAndExitMessages("No project version found")
             return
         }
 
-        println("=== Project version has been found! ===")
-        println("Found version: $version\n")
+        prettyLogger.printInfoMessage("Project version has been found")
+        prettyLogger.printInfoMessage("Found version: $currentEngineProjectVersion")
+        prettyLogger.printInfoMessage("")
 
-        println("=== Choose the next version: ===")
-        val nextVersion : String? = readlnOrNull()
+        val nextVersion = questionService.askNextVersionQuestion()
 
-        if (nextVersion == null) {
-            println("Error setting the new version")
+        if (nextVersion.isNullOrEmpty() || nextVersion.isBlank()) {
+            prettyLogger.printErrorAndExitMessages("An invalid version has been provided")
             return
         }
 
-        println("=== Version $nextVersion will be set on pom files! ===")
-        println("\n > Are you sure? [y/n]")
+        prettyLogger.printInfoMessage("")
+        prettyLogger.printInfoMessage("Version $nextVersion will be set on all pom files")
+        prettyLogger.printInfoMessage("")
 
-        var confirmOrDismissNewVersion: String? = readlnOrNull()
+        val nextVersionIsCorrect = questionService
+            .askPositiveOrNegativeQuestionQuestion("Are you sure? [y/n]")
 
-        while (confirmOrDismissNewVersion != "y" && confirmOrDismissNewVersion != "n") {
-            confirmOrDismissNewVersion = readlnOrNull()
-        }
-
-        if (confirmOrDismissNewVersion == "n") {
+        if (!nextVersionIsCorrect) {
+            printExitMessage()
             return
         }
 
-        val runtime = Runtime.getRuntime()
+        mavenCommandsService.setNewVersionAndCommit(nextVersion, engineProjectPath)
 
-        println("\n=== Setting version $nextVersion on project! ===\n")
-        runtime.exec("mvn versions:set -DnewVersion=''$nextVersion''".toPowerShellCommand(), null, File(engineProjectPath))
-            .waitFor()
+        prettyLogger.printInfoMessage("")
 
-        runtime.exec("mvn versions:commit".toPowerShellCommand(), null, File(engineProjectPath))
-            .waitFor()
+        mavenCommandsService.buildJars(engineProjectPath)
 
-        println("=== Building jars ===\n")
+        val bundleService = BundleService(prettyLogger)
 
-        val proc = runtime.exec("mvn clean package -DskipTests".toPowerShellCommand(), null, File(engineProjectPath))
+        val targetBundleFolder = Paths.get(bundlesProjectPath, bundlePath, tenant, engineName).toFile()
 
-        val stdInput = BufferedReader(InputStreamReader(proc.inputStream))
+        val latestBundlePaddedVersion = bundleService.getLatestBundlePaddedSerialNumber(bundleName, targetBundleFolder)
+            ?: return
 
-        // Read the output from the command
-        var outputLockEnabled = true
-        var s: String? = null
-        while ((stdInput.readLine().also { s = it }) != null) {
-            if (s?.contains("Reactor Summary for") == true) outputLockEnabled = false
+        val newBundleName = "$bundleName-$latestBundlePaddedVersion"
 
-            if (!outputLockEnabled) {
-                println(s)
-            }
-        }
-
-        println("=== Jar built ===\n")
-//
-//        // TODO: modules name from pom
-        val moduleTargetFolderFileList = Paths.get("$engineProjectPath/$engineProjectName", "target")
-            .toFile()
-            .listFiles()?.toList() ?: emptyList()
-
-        val jarFiles = moduleTargetFolderFileList
-            .filter { it.name.endsWith(".jar") }
-            .filter { !it.name.contains("original") }
-            .toList()
-
-        if (jarFiles.isEmpty() || jarFiles.size > 1) {
-            println("=== Didn't find the correct jar ===\n")
-            return
-        }
-
-        val jarFile = jarFiles[0]
-
-        println("=== Jar $jarFile is ready! ===\n")
-
-        val bundleFolder = Paths.get(bundlesProjectPath, bundlePath, tenant, engineName).toFile()
-
-        if (!bundleFolder.exists()) {
-            println("Error. Target Folder Bundle not found at $bundleFolder")
-        }
-
-        var previousBundles = bundleFolder.listFiles()
-            ?.filter { it.isDirectory }
-            ?.filter { it.name.contains(bundleName) }
-            ?: listOf()
-
-        if (previousBundles.isEmpty()) {
-            println("Error. Bundle with name $bundleName does not exist")
-            return
-        }
-
-        previousBundles = previousBundles.sortedByDescending { it.name }
-
-        val latestBundle = previousBundles[0]
-
-        val splitBundleName = latestBundle.name.split("-")
-
-        if (splitBundleName.size != 3) {
-            println("Error. Cannot extract bundle version from file")
-            return
-        }
-
-        val latestBundleVersion = splitBundleName[2]
-
-        val latestBundleVersionInt = latestBundleVersion.toIntOrNull()
-
-        if (latestBundleVersionInt == null) {
-            println("Cannot convert latest bundle version to a Number")
-            return
-        }
-
-        val paddedBundleVersion = (latestBundleVersionInt + 1).toString().padStart(4, '0')
-        val newBundleName = "$bundleName-$paddedBundleVersion"
-
-        val newBundleFolders = Paths.get(bundleFolder.path, newBundleName, bundleSubFolder).toFile()
+        val newBundleFolders = Paths.get(targetBundleFolder.path, newBundleName, bundleSubFolder).toFile()
 
         if (!newBundleFolders.mkdirs()) {
-            println("Cannot create folders")
+            prettyLogger.printErrorAndExitMessages("Cannot create target bundle folders")
             return
         }
 
-        val targetJarFile = File(newBundleFolders, jarFile.name)
+        val jarFileService = JarFileServices(prettyLogger)
 
-        jarFile.copyTo(targetJarFile, true)
+        val areJarFilesCorrectlyMoved = jarFileService
+            .moveJarFilesToBundles(engineJavaModulesNames, engineProjectPath, newBundleFolders)
 
-        val branchName = "test/bundle-deployer"
-        val commitMessage = "this is a test of deploying ${jarFile.name}"
+        if (!areJarFilesCorrectlyMoved) return
 
-        runtime.exec("git fetch --all --prune --prune-tags".toPowerShellCommand(), null, File(bundlesProjectPath))
-            .waitFor()
+        val gitService = GitService(prettyLogger)
 
-        runtime.exec("git checkout master".toPowerShellCommand(), null, File(bundlesProjectPath))
-            .waitFor()
+        gitService.syncRepositoryAndPrepareReleaseBranch(nextVersion, bundlesProjectPath)
 
-        runtime.exec("git pull origin master".toPowerShellCommand(), null, File(bundlesProjectPath))
-            .waitFor()
+        prettyLogger.printInfoMessage("Bundle $bundleName deployed successfully!!!")
+    }
 
-        runtime.exec("git switch -c $branchName".toPowerShellCommand(), null, File(bundlesProjectPath))
-            .waitFor()
-
-        runtime.exec("git add .", null, File(bundlesProjectPath))
-            .waitFor()
-
-        runtime.exec(listOf("powershell.exe", "git", "commit", "-m", "'$commitMessage'").toTypedArray(), null, File(bundlesProjectPath))
-
-        val shouldPush = false
+    private fun printExitMessage() {
+        prettyLogger.printErrorAndExitMessages("You have chosen to exit the application")
     }
 }

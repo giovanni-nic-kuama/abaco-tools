@@ -16,6 +16,10 @@ class PrettyLogger {
         AnsiConsole.out().println(Ansi.AUTO.string("[@|bold,blue INFO|@] $message"))
     }
 
+    fun printSuccessMessage(message: String) {
+        AnsiConsole.out().println(Ansi.AUTO.string("[@|bold,green FINE|@]  @|bold,green INFO|@ $message"))
+    }
+
     fun printWarnMessage(message: String) {
         AnsiConsole.out().println(Ansi.AUTO.string("[@|bold,yellow WARN|@] $message"))
     }
