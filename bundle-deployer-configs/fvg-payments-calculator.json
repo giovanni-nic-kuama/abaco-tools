@@ -1,0 +1,17 @@
+{
+  "configurationName": "fvg-payments-calculator",
+  "pomFileName": "pom.xml",
+  "engineProjectPath": "C:\\Users\\Noitu\\Devel\\abaco\\fvg-payment-calculator",
+  "engineJavaModulesNames": [
+    {
+      "tenant": "master",
+      "moduleName": "fvg-uniapp-payment-calculator"
+    }
+  ],
+  "bundlesProjectPath" : "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles",
+  "configFolderName": "config",
+  "engineKind": "calculator-engine",
+  "bundleName": "appspayproc",
+  "bundleSubFolder": "calculator-type",
+  "autoPushEnabled": false
+}

@@ -10,6 +10,7 @@ data class BuildConfiguration(
     val engineKind: String,
     val bundleName: String,
     val bundleSubFolder: String,
+    val autoPushEnabled: Boolean
 )
 
 data class ModuleWithTenantConfiguration(

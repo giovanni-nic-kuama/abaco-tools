@@ -16,5 +16,6 @@
   "configFolderName": "config",
   "engineKind": "print-engine",
   "bundleName": "appspay-proc",
-  "bundleSubFolder": "print-flow"
+  "bundleSubFolder": "print-flow",
+  "autoPushEnabled": false
 }

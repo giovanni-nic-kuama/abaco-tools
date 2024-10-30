@@ -1,20 +1,25 @@
 {
-  "configurationName": "fvg-payments-print",
+  "configurationName": "agea-alignment-summary-report",
   "pomFileName": "pom.xml",
-  "engineProjectPath": "C:\\Users\\Noitu\\Devel\\abaco\\fvg-payment-prints",
+  "engineProjectPath": "C:\\Users\\Noitu\\Devel\\abaco\\agea-prints",
   "engineJavaModulesNames": [
     {
-      "tenant": "master",
-      "moduleName": "liquidation-list"
+      "tenant": "fruit",
+      "moduleName": "fruit-alignment-summary"
     },
     {
-      "tenant": "master",
-      "moduleName": "payment-file"
+      "tenant": "olive",
+      "moduleName": "olive-tree-alignment-summary"
+    },
+    {
+      "tenant": "vine",
+      "moduleName": "alignment-summary"
     }
   ],
-  "bundlesProjectPath" : "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles",
+  "bundlesProjectPath" : "C:\\Users\\Noitu\\Devel\\abaco\\bundles-agea-dev",
   "configFolderName": "config",
   "engineKind": "print-engine",
-  "bundleName": "appspay-proc",
-  "bundleSubFolder": "print-flow"
+  "bundleName": "print",
+  "bundleSubFolder": "print-flow",
+  "autoPushEnabled": false
 }

@@ -197,7 +197,8 @@ class BundleDeployer : Runnable {
 
         prettyLogger.printInfoMessage("")
 
-        gitService.syncRepositoryAndPrepareReleaseBranch(nextVersion, buildConfiguration.bundlesProjectPath)
+        gitService.prepareReleaseBranchForEngine(nextVersion, buildConfiguration)
+        gitService.syncRepositoryAndPrepareReleaseBranch(nextVersion, buildConfiguration)
 
         prettyLogger.printInfoMessage("Bundle ${buildConfiguration.bundleName} deployed successfully!!!")
     }
