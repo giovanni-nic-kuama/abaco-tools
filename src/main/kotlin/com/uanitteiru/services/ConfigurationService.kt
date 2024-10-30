@@ -7,11 +7,10 @@ import java.nio.file.Paths
 
 class ConfigurationService(private val prettyLogger: PrettyLogger) {
 
-    fun getAvailableConfigurations() : List<String>? {
+    fun getAvailableConfigurations(configsPath: String) : List<String>? {
         // From where the project is started
-        val path = System.getProperty("user.dir")
 
-        val configurationsFolder = Paths.get(path, "bundle-deployer-configs").toFile()
+        val configurationsFolder = Paths.get(configsPath).toFile()
 
         if (!configurationsFolder.exists()) {
             prettyLogger.printErrorAndExitMessages("Didn't found the configurations folder")

@@ -10,6 +10,7 @@ import com.uanitteiru.services.PomFileService
 import com.uanitteiru.services.QuestionService
 import com.uanitteiru.utils.PrettyLogger
 import java.nio.file.Paths
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import picocli.CommandLine.Command
 
 @Command(name = "bundle-deployer", mixinStandardHelpOptions = true)
@@ -23,6 +24,9 @@ class BundleDeployer : Runnable {
     private val bundleService = BundleService(prettyLogger)
     private val jarFileService = JarFileServices(prettyLogger)
     private val gitService = GitService(prettyLogger)
+
+    @ConfigProperty(name = "configs.path")
+    lateinit var configsPath: String
 
     override fun run() {
         // 1) Exposes Java and Maven Version
@@ -43,7 +47,7 @@ class BundleDeployer : Runnable {
         prettyLogger.printInfoMessage("Loaded Projects:")
         prettyLogger.printInfoMessage("")
 
-        val availableConfigurations = configurationService.getAvailableConfigurations()
+        val availableConfigurations = configurationService.getAvailableConfigurations(configsPath)
 
         if (availableConfigurations == null) {
             prettyLogger.printErrorAndExitMessages("No configuration files found")
