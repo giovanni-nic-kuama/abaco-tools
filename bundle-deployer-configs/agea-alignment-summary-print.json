@@ -1,0 +1,20 @@
+{
+  "configurationName": "fvg-payments-print",
+  "pomFileName": "pom.xml",
+  "engineProjectPath": "C:\\Users\\Noitu\\Devel\\abaco\\fvg-payment-prints",
+  "engineJavaModulesNames": [
+    {
+      "tenant": "master",
+      "moduleName": "liquidation-list"
+    },
+    {
+      "tenant": "master",
+      "moduleName": "payment-file"
+    }
+  ],
+  "bundlesProjectPath" : "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles",
+  "configFolderName": "config",
+  "engineKind": "print-engine",
+  "bundleName": "appspay-proc",
+  "bundleSubFolder": "print-flow"
+}

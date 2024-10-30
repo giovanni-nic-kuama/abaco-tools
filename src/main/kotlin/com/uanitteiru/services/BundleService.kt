@@ -5,7 +5,7 @@ import java.io.File
 
 class BundleService(private val prettyLogger: PrettyLogger) {
 
-    fun getLatestBundlePaddedSerialNumber(bundleName: String, targetBundleFolder: File) : String? {
+    fun getBundleNewPaddedSerialNumber(bundleName: String, targetBundleFolder: File) : String? {
         // Bundle Search
         if (!targetBundleFolder.exists()) {
             prettyLogger.printErrorAndExitMessages("Target Bundle folder [$targetBundleFolder] not found")

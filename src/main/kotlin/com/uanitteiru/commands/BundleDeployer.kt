@@ -1,6 +1,7 @@
 package com.uanitteiru.commands
 
 import com.uanitteiru.services.BundleService
+import com.uanitteiru.services.ConfigurationService
 import com.uanitteiru.services.GitService
 import com.uanitteiru.services.JarFileServices
 import com.uanitteiru.services.JavaAndMavenService
@@ -8,32 +9,26 @@ import com.uanitteiru.services.MavenCommandsService
 import com.uanitteiru.services.PomFileService
 import com.uanitteiru.services.QuestionService
 import com.uanitteiru.utils.PrettyLogger
-import com.uanitteiru.utils.toPowerShellCommand
-import picocli.CommandLine.Command
-import java.io.File
 import java.nio.file.Paths
+import picocli.CommandLine.Command
 
 @Command(name = "bundle-deployer", mixinStandardHelpOptions = true)
 class BundleDeployer : Runnable {
     private val prettyLogger = PrettyLogger()
-    private val pomFileName = "pom.xml"
-    private val engineProjectPath = "C:\\Users\\Noitu\\Devel\\abaco\\fvg-payment-prints"
-    private val engineJavaModulesNames = listOf("liquidation-list", "payment-file")
-    private val bundlesProjectPath = "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles"
-    private val bundlePath = "config"
-    private val tenant = "master"
-    private val engineName = "print-engine"
-    private val bundleName = "appspay-proc"
-    private val bundleSubFolder = "print-flow"
+    private val configurationService = ConfigurationService(prettyLogger)
+    private val questionService = QuestionService(prettyLogger)
+    private val mavenCommandsService = MavenCommandsService(prettyLogger)
+    private val javaAndMavenService = JavaAndMavenService(prettyLogger)
+    private val pomFileService = PomFileService(prettyLogger)
+    private val bundleService = BundleService(prettyLogger)
+    private val jarFileService = JarFileServices(prettyLogger)
+    private val gitService = GitService(prettyLogger)
 
     override fun run() {
-        val questionService = QuestionService(prettyLogger)
-        val mavenCommandsService = MavenCommandsService(prettyLogger)
-
         // 1) Exposes Java and Maven Version
         prettyLogger.printInfoMessage("Abaco CLI Deployer Tools")
 
-        JavaAndMavenService(prettyLogger).evaluateMavenAndJavaVersions()
+        javaAndMavenService.evaluateMavenAndJavaVersions()
 
         // 2) Ask user if maven and java are correct.
         val javaVersionIsCorrect = questionService
@@ -48,8 +43,49 @@ class BundleDeployer : Runnable {
         prettyLogger.printInfoMessage("Loaded Projects:")
         prettyLogger.printInfoMessage("")
 
-        prettyLogger.printInfoMessage("Engine project:    $engineProjectPath")
-        prettyLogger.printInfoMessage("Bundle project:    $bundlesProjectPath")
+        val availableConfigurations = configurationService.getAvailableConfigurations()
+
+        if (availableConfigurations == null) {
+            prettyLogger.printErrorAndExitMessages("No configuration files found")
+            return
+        }
+
+        prettyLogger.printInfoMessage("Currently available configuration files:")
+        prettyLogger.printInfoMessage("")
+
+        val maxIndex = availableConfigurations.size - 1
+
+        availableConfigurations.forEachIndexed { index, fileName ->
+            prettyLogger.printInfoMessage("[$index] $fileName")
+        }
+
+        prettyLogger.printInfoMessage("")
+        prettyLogger.printInfoMessage("Choose a configuration (from 0 to $maxIndex):")
+        prettyLogger.printInfoMessage("")
+
+        prettyLogger.printInputTag()
+        var fileIndex = readlnOrNull()?.toIntOrNull() ?: -1
+
+        while (fileIndex < 0 || fileIndex > maxIndex) {
+            prettyLogger.printWarnMessage("Wrong index. Choose a config file (from 0 to $maxIndex):")
+            prettyLogger.printInputTag()
+            fileIndex = readlnOrNull()?.toIntOrNull() ?: -1
+        }
+
+        val chosenFileName = availableConfigurations[fileIndex]
+
+        prettyLogger.printInfoMessage("Selected file: $chosenFileName")
+        prettyLogger.printInfoMessage("")
+
+        val buildConfiguration = configurationService.getConfigurationByFileName(chosenFileName)
+
+        if (buildConfiguration == null) {
+            prettyLogger.printErrorAndExitMessages("Internal error. No configuration found with name: $chosenFileName")
+            return
+        }
+
+        prettyLogger.printInfoMessage("Engine project:    ${buildConfiguration.engineProjectPath}")
+        prettyLogger.printInfoMessage("Bundle project:    ${buildConfiguration.bundlesProjectPath}")
         prettyLogger.printInfoMessage("")
 
         val projectsAreCorrect = questionService
@@ -64,10 +100,10 @@ class BundleDeployer : Runnable {
         prettyLogger.printInfoMessage("Searching engine project pom file...")
         prettyLogger.printInfoMessage("")
 
-        val enginePomFile = Paths.get(engineProjectPath, pomFileName).toFile()
+        val enginePomFile = Paths.get(buildConfiguration.engineProjectPath, buildConfiguration.pomFileName).toFile()
 
         if (!enginePomFile.exists()) {
-            prettyLogger.printErrorAndExitMessages("pom file not found for engine project at $engineProjectPath")
+            prettyLogger.printErrorAndExitMessages("pom file not found for engine project at ${buildConfiguration.engineProjectPath}")
             return
         }
 
@@ -76,7 +112,7 @@ class BundleDeployer : Runnable {
         prettyLogger.printInfoMessage("Retrieving engine current version...")
         prettyLogger.printInfoMessage("")
 
-        val currentEngineProjectVersion = PomFileService(prettyLogger).scanPomFileForVersion(enginePomFile)
+        val currentEngineProjectVersion = pomFileService.scanPomFileForVersion(enginePomFile)
 
         if (currentEngineProjectVersion == null) {
             prettyLogger.printErrorAndExitMessages("No project version found")
@@ -106,40 +142,64 @@ class BundleDeployer : Runnable {
             return
         }
 
-        mavenCommandsService.setNewVersionAndCommit(nextVersion, engineProjectPath)
+        mavenCommandsService.setNewVersionAndCommit(nextVersion, buildConfiguration.engineProjectPath)
 
         prettyLogger.printInfoMessage("")
 
-        mavenCommandsService.buildJars(engineProjectPath)
+        mavenCommandsService.buildJars(buildConfiguration.engineProjectPath)
 
-        val bundleService = BundleService(prettyLogger)
+        val createdBundlesWithoutVersions = mutableMapOf<String, String>()
 
-        val targetBundleFolder = Paths.get(bundlesProjectPath, bundlePath, tenant, engineName).toFile()
+        for (engineJavaModule in buildConfiguration.engineJavaModulesNames) {
+            val targetBundleFolder = Paths.get(
+                buildConfiguration.bundlesProjectPath,
+                buildConfiguration.configFolderName,
+                engineJavaModule.tenant,
+                buildConfiguration.engineKind
+            ).toFile()
 
-        val latestBundlePaddedVersion = bundleService.getLatestBundlePaddedSerialNumber(bundleName, targetBundleFolder)
-            ?: return
 
-        val newBundleName = "$bundleName-$latestBundlePaddedVersion"
+            val newBundleName: String = if (createdBundlesWithoutVersions[targetBundleFolder.path] == null) {
+                val newBundlePaddedVersion = bundleService
+                    .getBundleNewPaddedSerialNumber(buildConfiguration.bundleName, targetBundleFolder)
+                    ?: return
 
-        val newBundleFolders = Paths.get(targetBundleFolder.path, newBundleName, bundleSubFolder).toFile()
+                createdBundlesWithoutVersions[targetBundleFolder.path] = newBundlePaddedVersion
 
-        if (!newBundleFolders.mkdirs()) {
-            prettyLogger.printErrorAndExitMessages("Cannot create target bundle folders")
-            return
+                "${buildConfiguration.bundleName}-$newBundlePaddedVersion"
+            } else {
+                "${buildConfiguration.bundleName}-${createdBundlesWithoutVersions[targetBundleFolder.path]}"
+            }
+
+            val newBundleFolders = Paths
+                .get(targetBundleFolder.path, newBundleName, buildConfiguration.bundleSubFolder).toFile()
+
+            if (!newBundleFolders.exists()) {
+                if (!newBundleFolders.mkdirs()) {
+                    prettyLogger.printErrorAndExitMessages("Cannot create target bundle folders")
+                    return
+                }
+            }
+
+            val areJarFilesCorrectlyMoved = jarFileService.moveJarFilesToBundles(
+                engineJavaModule.moduleName,
+                buildConfiguration.engineProjectPath,
+                newBundleFolders
+            )
+
+            if (!areJarFilesCorrectlyMoved) {
+                return
+            }
+
+            prettyLogger.printInfoMessage("Done")
+            prettyLogger.printInfoMessage("")
         }
 
-        val jarFileService = JarFileServices(prettyLogger)
+        prettyLogger.printInfoMessage("")
 
-        val areJarFilesCorrectlyMoved = jarFileService
-            .moveJarFilesToBundles(engineJavaModulesNames, engineProjectPath, newBundleFolders)
+        gitService.syncRepositoryAndPrepareReleaseBranch(nextVersion, buildConfiguration.bundlesProjectPath)
 
-        if (!areJarFilesCorrectlyMoved) return
-
-        val gitService = GitService(prettyLogger)
-
-        gitService.syncRepositoryAndPrepareReleaseBranch(nextVersion, bundlesProjectPath)
-
-        prettyLogger.printInfoMessage("Bundle $bundleName deployed successfully!!!")
+        prettyLogger.printInfoMessage("Bundle ${buildConfiguration.bundleName} deployed successfully!!!")
     }
 
     private fun printExitMessage() {
