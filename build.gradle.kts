@@ -23,13 +23,14 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("io.quarkus:quarkus-arc")
     implementation("org.fusesource.jansi:jansi:2.4.1")
+    implementation("io.quarkus:quarkus-rest-client-jackson")
     // https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.0")
     testImplementation("io.quarkus:quarkus-junit5")
 }
 
 group = "com.uanitteiru"
-version = "1.0.1"
+version = "1.0.2"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
