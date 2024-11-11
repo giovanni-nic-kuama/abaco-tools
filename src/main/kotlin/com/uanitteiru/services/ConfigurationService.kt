@@ -20,10 +20,8 @@ class ConfigurationService(private val prettyLogger: PrettyLogger) {
         return configurationsFolder.listFiles()?.map { it.name }
     }
 
-    fun getConfigurationByFileName(fileName: String) : BuildConfiguration? {
-        val path = System.getProperty("user.dir")
-
-        val configurationFile = Paths.get(path, "bundle-deployer-configs", fileName).toFile()
+    fun getConfigurationByFileName(configsPath: String, fileName: String) : BuildConfiguration? {
+        val configurationFile = Paths.get(configsPath, fileName).toFile()
 
         if (!configurationFile.exists()) {
             return null

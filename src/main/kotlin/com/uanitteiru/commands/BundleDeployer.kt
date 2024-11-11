@@ -81,7 +81,7 @@ class BundleDeployer : Runnable {
         prettyLogger.printInfoMessage("Selected file: $chosenFileName")
         prettyLogger.printInfoMessage("")
 
-        val buildConfiguration = configurationService.getConfigurationByFileName(chosenFileName)
+        val buildConfiguration = configurationService.getConfigurationByFileName(configsPath, chosenFileName)
 
         if (buildConfiguration == null) {
             prettyLogger.printErrorAndExitMessages("Internal error. No configuration found with name: $chosenFileName")
