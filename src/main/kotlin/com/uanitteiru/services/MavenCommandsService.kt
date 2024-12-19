@@ -2,6 +2,7 @@ package com.uanitteiru.services
 
 import com.uanitteiru.utils.PrettyLogger
 import com.uanitteiru.utils.powershell
+import com.uanitteiru.utils.readToString
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -12,17 +13,21 @@ class MavenCommandsService(private val prettyLogger: PrettyLogger) {
         prettyLogger.printInfoMessage("")
         prettyLogger.printInfoMessage("Setting version $version on all project modules...")
 
-        ProcessBuilder(powershell, "mvn", "versions:set", "-DnewVersion=''$version''")
+        val versionsSetProcess = ProcessBuilder(powershell, "mvn", "versions:set", "-DnewVersion=''$version''")
             .directory(File(engineProjectPath))
             .start()
-            .waitFor()
+
+        // Avoid deadlock conditions it the command output fill the buffer size of the shell
+        versionsSetProcess.inputStream.readToString()
 
         prettyLogger.printInfoMessage("Committing the new version on all project modules...")
 
-        ProcessBuilder(powershell, "mvn", "versions:commit")
+        val versionsCommitProcess = ProcessBuilder(powershell, "mvn", "versions:commit")
             .directory(File(engineProjectPath))
             .start()
-            .waitFor()
+
+        // Avoid deadlock conditions it the command output fill the buffer size of the shell
+        versionsCommitProcess.inputStream.readToString()
     }
 
     fun buildJars(engineProjectPath: String) {

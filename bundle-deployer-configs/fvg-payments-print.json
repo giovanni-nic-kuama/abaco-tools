@@ -10,6 +10,22 @@
     {
       "tenant": "master",
       "moduleName": "payment-file"
+    },
+    {
+      "tenant": "master",
+      "moduleName": "final-liquidation-list"
+    },
+    {
+      "tenant": "master",
+      "moduleName": "final-payment-file"
+    },
+    {
+      "tenant": "master",
+      "moduleName": "sre01-payment-file"
+    },
+    {
+      "tenant": "master",
+      "moduleName": "sre01-liquidation-list"
     }
   ],
   "bundlesProjectPath" : "C:\\Users\\Noitu\\Devel\\abaco\\agri-bundles",
